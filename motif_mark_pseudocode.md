@@ -60,3 +60,7 @@ Algorithm:
     - basically loop through each item in dict and plot it
 
   - to be continued...
+
+
+Pycairo Drawing:
+  - 

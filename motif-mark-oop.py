@@ -3,7 +3,8 @@
 from sys import flags
 import cairo    #pycairo library to draw images
 import argparse
-import re       # regular expressions
+import re       #regular expressions
+import seaborn  #need for color palette
 
 
 # ---------- Class definitions ----------
@@ -38,20 +39,19 @@ class Motif:
         return regex_str
 
 
-
-
 class Gene:
     '''Class for Gene objects read in from each record in a FASTA file.'''
     # specify Gene object attributes (specifying slots reduces memory usage)
-    __slots__ = ['name', 'chrom_name', 'start_pos','stop_pos','intron_exon_dict']
+    __slots__ = ['name', 'chrom_name', 'start_pos','stop_pos','seq', 'intron_exon_dict']
 
     # ----- Constructor -----
-    def __init__(self, gene_name: str, chromosome_name: str, start_position: int, stop_position: int, intron_exon_dictionary: dict):
+    def __init__(self, gene_name: str, chromosome_name: str, start_position: int, stop_position: int, sequence: str, intron_exon_dictionary: dict):
         '''Constructor method to initialize new Gene objects.'''
         self.name = gene_name
         self.chrom_name = chromosome_name
         self.start_pos = start_position
         self.stop_pos = stop_position
+        self.seq = sequence
         self.intron_exon_dict = intron_exon_dictionary
             # {"intron": list(), "exon": list()}
             # key: "intron" or "exon"
@@ -62,36 +62,6 @@ class Gene:
     # def find_motifs(self, regex_motif_list: list):
     #     '''Takes in a list of motif sequences that have been converted to their regular expression equivalent, and searches for each regex motif in the Gene object's sequence.'''
 
-
-
-
-# # function to draw a sample pycairo image for OOCA
-# def draw_sample_img():
-#     # create an svg surface object (like a canvas) on which to draw things
-#     surface1 = cairo.SVGSurface("ooca_image.svg", 100, 100)
-
-#     # create a context object and instantiate it with the surface that it will use
-#     context1 = cairo.Context(surface1)
-
-#     # draw a line (not at the origin position) on the image surface
-#     context1.set_line_width(3)
-#     context1.set_source_rgb(0, 0, 0.7) # set RGB colors of line
-#     context1.move_to(50, 50)
-#     context1.line_to(50, 80)
-#     context1.stroke()
-
-#     # draw a rectangle (not at the origin position) on the image surface
-#     context1.set_line_width(1)
-#     context1.set_source_rgba(0.4, 0, 0.5, 0.5) # set RGB colors and alpha level of rectangle
-#     context1.rectangle(25, 35, 50, 30) #create rectangle with top left position at (25, 35), width of 50, height of 30
-#     context1.fill() # fill the rectangle in with the same colors as border of rectangle
-#     context1.stroke() # needed if you are drawing the outline of the rectangle but have no fill set
-
-#     #write svg surface to png (need to do this before finishing the surface)
-#     surface1.write_to_png("thai_ooca_image.png")
-
-#     # when done drawing shapes, finish the surface so it can't be edited anymore
-#     surface1.finish()
 
 
 # ---------- Global function definitions ----------
@@ -143,11 +113,120 @@ def oneline_fasta(filename: str) -> str:
     return output_fname
 
 
-def create_image(gene_motifs_dict: dict, output_image_name: str):
+def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_name: str):
     '''Takes in an output image filename and a dictionary with Gene objects as keys and values as nested list, with each inner list holding motif objects in element 0 and tuples of start/stop positions of each motif in subsequent elements (i.e., [[motif1, (start1, stop1), (start2, stop2), etc], [motif2, (start1, stop1), (start2, stop2), etc]]). Creates a Pycairo image of all the genes, including their introns and exons, along with locations of each motif along each gene.Saves the Pycairo image into a file with the given output image filename.'''
 
+    #local variables
+    GENE_SURFACE_WIDTH: float = 800         #width of surface object for each gene drawing in points 
+    GENE_SURFACE_HEIGHT: float = 150        #height of surface object for each gene drawing in points 
+    LEGEND_SURFACE_WIDTH: float = 200       #width of legend surface object in points
+    TITLE_SURFACE_WIDTH: float = GENE_SURFACE_WIDTH
+    TITLE_SURFACE_HEIGHT: float = 50
+    PARENT_SURFACE_WIDTH: float = GENE_SURFACE_WIDTH +  LEGEND_SURFACE_WIDTH     #width (in points) of parent surface object that will hold all other drawing sub-surfaces
+    PARENT_SURFACE_HEIGHT: float = 0        #initialize to 0 then calculate below
+
+    longest_gene_seq: str = ""
+    longest_motif_seq: str = ""
+    padding_dict: dict = {"top": 20, "right": 20, "bottom": 20, "left": 20} #number of points to pad the top, right, bottom, and left sides of a gene image element
+    colors_dict: dict = {"intron": (0.3, 0.3, 0.3), "exon": (0.3, 0.3, 0.3)} 
+        #holds color scheme for images. Initialized with intron and exon colors. Motif colors will be added later.
+        #key: motif seq or the literal strings "exon" or "intron"
+        #value: tuple holding RGB color scheme for motifs and introns/exons (R,G,B)
+
+
+    #before creating image surface, get length of longest gene seq and longest motif seq
+    for gene_obj in gene_motifs_dict:
+        if len(gene_obj.seq) > len(longest_gene_seq):
+            longest_gene_seq = gene_obj.seq
     
-    
+    for motif_obj in motif_object_list:
+        if len(motif_obj.seq) > len(longest_motif_seq):
+            longest_motif_seq = motif_obj.seq
+
+    #create parent surface
+    PARENT_SURFACE_HEIGHT = TITLE_SURFACE_HEIGHT + (len(gene_motifs_dict) * GENE_SURFACE_HEIGHT)
+    parent_surface = cairo.ImageSurface(cairo.Format.RGB24, PARENT_SURFACE_WIDTH, PARENT_SURFACE_HEIGHT)
+
+    #add title surface to parent surface
+    title_surface = parent_surface.create_for_rectangle(0, 0, TITLE_SURFACE_WIDTH, TITLE_SURFACE_HEIGHT)
+    title_context = cairo.Context(title_surface)
+    title_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
+    title_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
+    title_context.set_font_size(18)
+    title_context.move_to(padding_dict["left"], padding_dict["top"])
+    title_context.show_text(output_image_name)
+
+    #add legend surface to parent surface
+    legend_surface = parent_surface.create_for_rectangle(TITLE_SURFACE_WIDTH, 0, LEGEND_SURFACE_WIDTH, PARENT_SURFACE_HEIGHT)
+    legend_context = cairo.Context(legend_surface)
+    legend_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
+    legend_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
+    legend_context.set_font_size(18)
+    legend_context.move_to(padding_dict["left"], padding_dict["top"])
+    legend_context.show_text("Legend")
+
+    #add motif sequences to legend
+    motif_color_palette = seaborn.color_palette(None, len(motif_object_list))
+    for motif_obj in motif_object_list:
+        motif_index = motif_object_list.index(motif_obj)
+
+        #add each motif's RGB color scheme to colors dict
+        colors_dict[motif_obj.seq] = motif_color_palette[motif_index]
+        
+        #display legend with color-coded motifs
+        legend_context.set_font_size(18)
+        legend_context.move_to(padding_dict["left"], padding_dict["top"]*(motif_index + 3))
+        legend_context.set_source_rgba(colors_dict[motif_obj.seq][0], colors_dict[motif_obj.seq][1], colors_dict[motif_obj.seq][2], 0.7)
+        legend_context.show_text(motif_obj.seq)
+
+
+    #add each gene surface to parent surface
+    gene_scale_factor =  GENE_SURFACE_WIDTH / len(longest_gene_seq)
+    gene_obj_list = list(gene_motifs_dict.keys())
+    for gene_obj in gene_obj_list:
+
+        gene_index = gene_obj_list.index(gene_obj)
+        gene_surface = parent_surface.create_for_rectangle(padding_dict["left"], TITLE_SURFACE_HEIGHT + (gene_index*GENE_SURFACE_HEIGHT), GENE_SURFACE_WIDTH, GENE_SURFACE_HEIGHT)
+        gene_context = cairo.Context(gene_surface)
+
+        #draw gene label
+        gene_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
+        gene_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
+        gene_context.set_font_size(18)
+        gene_context.move_to(0, padding_dict["top"])
+        gene_context.show_text(gene_obj.name + " " + gene_obj.chrom_name + ":" + str(gene_obj.start_pos) + "-" + str(gene_obj.stop_pos))
+
+        #draw introns
+        gene_context.set_source_rgba(colors_dict["intron"][0], colors_dict["intron"][1], colors_dict["intron"][2], 0.8) #set color to light gray
+        for intron_region in gene_obj.intron_exon_dict["intron"]:
+            gene_context.set_line_width(5)
+            gene_context.move_to(gene_scale_factor * intron_region[0], GENE_SURFACE_HEIGHT / 2)
+            gene_context.line_to(gene_scale_factor * intron_region[1], GENE_SURFACE_HEIGHT / 2)
+            gene_context.stroke()
+
+        #draw exons
+        gene_context.set_source_rgba(colors_dict["exon"][0], colors_dict["exon"][1], colors_dict["exon"][2], 0.8) #set label color to light gray
+        for exon_region in gene_obj.intron_exon_dict["exon"]:
+            gene_context.set_line_width(60)
+            gene_context.move_to(gene_scale_factor * exon_region[0], GENE_SURFACE_HEIGHT / 2)
+            gene_context.line_to(gene_scale_factor * exon_region[1], GENE_SURFACE_HEIGHT / 2)
+            gene_context.stroke()
+
+        #draw motifs
+        for motif_positions_list in gene_motifs_dict[gene_obj]:
+            motif_seq = motif_positions_list[0]
+            gene_context.set_source_rgba(colors_dict[motif_seq][0], colors_dict[motif_seq][1], colors_dict[motif_seq][2], 0.8) #set motif color to correct color
+            gene_context.set_line_width(40)
+
+            for position_tuple in motif_positions_list[1:]:
+                gene_context.move_to(gene_scale_factor * position_tuple[0], GENE_SURFACE_HEIGHT / 2)
+                gene_context.line_to(gene_scale_factor * position_tuple[1], GENE_SURFACE_HEIGHT / 2)
+                gene_context.stroke()
+
+
+
+    parent_surface.write_to_png("test_image.png")
+
 
 
 def main():
@@ -164,12 +243,13 @@ def main():
     gene_chrom_name: str = ""
     gene_start_pos: int = 0
     gene_stop_pos: int = 0
+    gene_sequence: str = ""
     gene_intron_exon_dict: dict = {}
         # key: "intron" or "exon"
         # value: list of tuples containing start and stop positions of each intron or exon encountered in a gene sequence
             # note that the positions stored in the tuples are lower bound inclusive and upper bound exclusive
     
-    gene_obj: Gene = Gene("", "", 0, 0, dict())
+    gene_obj: Gene = Gene("", "", 0, 0, "", dict())
     gene_motifs_dict: dict = {}
         # key: gene objects
         # value: nested list, with each inner list holding motif objects in element 0 and tuples of start/stop positions of each motif in subsequent elements. [[motif1, (start1, stop1), (start2, stop2), etc], [motif2, (start1, stop1), (start2, stop2), etc]]
@@ -187,8 +267,8 @@ def main():
                 line = line.strip()
                 motif_obj_list.append(Motif(line))
 
-        for motif_obj in motif_obj_list:
-            print(motif_obj.seq)
+        # for motif_obj in motif_obj_list:
+        #     print(motif_obj.seq)
             
                 
 
@@ -209,11 +289,12 @@ def main():
                     gene_start_pos = int(line_tokens[1].split(":")[1].split("-")[0])
                     gene_stop_pos = int(line_tokens[1].split(":")[1].split("-")[1])
                     gene_intron_exon_dict = {"intron": list(), "exon": list()}
-                    gene_obj = Gene(gene_name, gene_chrom_name, gene_start_pos, gene_stop_pos, gene_intron_exon_dict)
+                    gene_obj = Gene(gene_name, gene_chrom_name, gene_start_pos, gene_stop_pos, "", gene_intron_exon_dict)
                     
-                    # print(gene_obj.name, gene_obj.chrom_name, gene_obj.start_pos, gene_obj.stop_pos, gene_obj.intron_exon_dict)
+                    # print(gene_obj.name, gene_obj.chrom_name, gene_obj.start_pos, gene_obj.stop_pos, gene_obj.seq, gene_obj.intron_exon_dict)
                     
                 else:
+                    gene_obj.seq = line
                     #find positions of regex matches for all lowercase NTs (introns)
                     for match in re.finditer(r'[a-z]+', line):
                         match_position_tuple = (match.start(), match.end())
@@ -224,7 +305,7 @@ def main():
                         match_position_tuple = (match.start(), match.end())
                         gene_obj.intron_exon_dict["exon"].append(match_position_tuple)
 
-                    # print(gene_obj.name, gene_obj.chrom_name, gene_obj.start_pos, gene_obj.stop_pos, gene_obj.intron_exon_dict)
+                    #print(gene_obj.name, gene_obj.chrom_name, gene_obj.start_pos, gene_obj.stop_pos, gene_obj.seq, gene_obj.intron_exon_dict)
 
                     #find positions of motifs in the gene sequence being read
                     gene_motifs_dict[gene_obj] = []
@@ -246,7 +327,7 @@ def main():
 
         # generate pycairo image of motifs and their locations along all genes in file
         output_img_fname = fasta_filename.split(".fa")[0] + ".png"
-        create_image(gene_motifs_dict, output_img_fname)
+        create_image(gene_motifs_dict, motif_obj_list, output_img_fname)
 
 
 
