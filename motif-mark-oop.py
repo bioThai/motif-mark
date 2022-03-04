@@ -23,7 +23,7 @@ class Motif:
     def get_regex_motif(self) -> str:
         '''Take in a raw motif sequence as read in from a text file, and converts the characters in the sequence into their IUPAC equivalents. Returns the converted sequence as a string.'''
         #local variables
-        iupac_to_regex_dict: dict = {"W":"[ATU]", "S":"[CG]", "M":"[AC]", "K":"[GTU]", "R":"[AG]", "Y":"[CTU]", "B":"[CGTU]", "D":"[AGTU]", "H":"[ACTU]", "V":"[ACG]", "N":"[ACGTU]"}
+        iupac_to_regex_dict: dict = {"W":"[ATU]", "S":"[CG]", "M":"[AC]", "K":"[GTU]", "R":"[AG]", "Y":"[CTU]", "B":"[CGTU]", "D":"[AGTU]", "H":"[ACTU]", "V":"[ACG]", "N":"[ACGTU]", "U":"[TU]", "T":"[TU]"}
         regex_str: str = ""
 
         #convert raw motif sequence to uppercase for consistency, 
@@ -128,7 +128,7 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
     longest_gene_seq: str = ""
     longest_motif_seq: str = ""
     padding_dict: dict = {"top": 20, "right": 20, "bottom": 20, "left": 20} #number of points to pad the top, right, bottom, and left sides of a gene image element
-    colors_dict: dict = {"intron": (0.3, 0.3, 0.3), "exon": (0.3, 0.3, 0.3)} 
+    colors_dict: dict = {"intron": (0.5, 0.5, 0.5), "exon": (0.35, 0.35, 0.35)} 
         #holds color scheme for images. Initialized with intron and exon colors. Motif colors will be added later.
         #key: motif seq or the literal strings "exon" or "intron"
         #value: tuple holding RGB color scheme for motifs and introns/exons (R,G,B)
@@ -151,8 +151,8 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
     title_surface = parent_surface.create_for_rectangle(0, 0, TITLE_SURFACE_WIDTH, TITLE_SURFACE_HEIGHT)
     title_context = cairo.Context(title_surface)
     title_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
-    title_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
-    title_context.set_font_size(18)
+    title_context.set_source_rgba(0.35, 0.35, 0.35, 1) #set label color to light gray
+    title_context.set_font_size(20)
     title_context.move_to(padding_dict["left"], padding_dict["top"])
     title_context.show_text(output_image_name)
 
@@ -160,10 +160,30 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
     legend_surface = parent_surface.create_for_rectangle(TITLE_SURFACE_WIDTH, 0, LEGEND_SURFACE_WIDTH, PARENT_SURFACE_HEIGHT)
     legend_context = cairo.Context(legend_surface)
     legend_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
-    legend_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
-    legend_context.set_font_size(18)
-    legend_context.move_to(padding_dict["left"], padding_dict["top"])
-    legend_context.show_text("Legend")
+    legend_context.set_source_rgba(0.8, 0.8, 0.8, 1) #set label color to light gray
+    legend_context.set_font_size(20)
+    legend_context.move_to(padding_dict["left"], TITLE_SURFACE_HEIGHT + padding_dict["top"])
+    legend_context.show_text("LEGEND:")
+
+    #display exon and intron color-codes in legend
+    legend_context.set_font_size(20)
+    legend_context.set_source_rgba(colors_dict["intron"][0], colors_dict["intron"][1], colors_dict["intron"][2], 0.7)
+    legend_context.move_to(padding_dict["left"], TITLE_SURFACE_HEIGHT + (padding_dict["top"]*2))
+    legend_context.set_line_width(3)
+    legend_context.line_to(padding_dict["left"] + 16, TITLE_SURFACE_HEIGHT + (padding_dict["top"]*2))
+    legend_context.stroke()
+    legend_context.move_to(padding_dict["left"] + 20, 4 + TITLE_SURFACE_HEIGHT + (padding_dict["top"]*2))
+    legend_context.show_text("intron")
+
+    legend_context.set_font_size(20)
+    legend_context.set_source_rgba(colors_dict["exon"][0], colors_dict["exon"][1], colors_dict["exon"][2], 0.7)
+    legend_context.move_to(padding_dict["left"], TITLE_SURFACE_HEIGHT + (padding_dict["top"]*3))
+    legend_context.set_line_width(16)
+    legend_context.line_to(padding_dict["left"] + 16, TITLE_SURFACE_HEIGHT + (padding_dict["top"]*3))
+    legend_context.stroke()
+    legend_context.move_to(padding_dict["left"] + 20, 4 + TITLE_SURFACE_HEIGHT + (padding_dict["top"]*3))
+    legend_context.show_text("exon")
+
 
     #add motif sequences to legend
     motif_color_palette = seaborn.color_palette(None, len(motif_object_list))
@@ -172,11 +192,16 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
 
         #add each motif's RGB color scheme to colors dict
         colors_dict[motif_obj.seq] = motif_color_palette[motif_index]
-        
-        #display legend with color-coded motifs
-        legend_context.set_font_size(18)
-        legend_context.move_to(padding_dict["left"], padding_dict["top"]*(motif_index + 3))
+
+        #display color-coded motifs in legend
+        legend_context.set_font_size(20)
         legend_context.set_source_rgba(colors_dict[motif_obj.seq][0], colors_dict[motif_obj.seq][1], colors_dict[motif_obj.seq][2], 0.7)
+        legend_context.move_to(padding_dict["left"], TITLE_SURFACE_HEIGHT + (padding_dict["top"]*(motif_index + 4)))
+        legend_context.set_line_width(16)
+        legend_context.line_to(padding_dict["left"] + 16, TITLE_SURFACE_HEIGHT + (padding_dict["top"]*(motif_index + 4)))
+        legend_context.stroke()
+
+        legend_context.move_to(padding_dict["left"] + 20, 4 + TITLE_SURFACE_HEIGHT + (padding_dict["top"]*(motif_index + 4)))
         legend_context.show_text(motif_obj.seq)
 
 
@@ -190,9 +215,9 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
         gene_context = cairo.Context(gene_surface)
 
         #draw gene label
-        gene_context.set_source_rgba(0.3, 0.3, 0.3, 1) #set label color to light gray
+        gene_context.set_source_rgba(0.8, 0.8, 0.8, 1) #set label color to light gray
         gene_context.select_font_face("monospace", cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD)
-        gene_context.set_font_size(18)
+        gene_context.set_font_size(20)
         gene_context.move_to(0, padding_dict["top"])
         gene_context.show_text(gene_obj.name + " " + gene_obj.chrom_name + ":" + str(gene_obj.start_pos) + "-" + str(gene_obj.stop_pos))
 
@@ -207,7 +232,7 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
         #draw exons
         gene_context.set_source_rgba(colors_dict["exon"][0], colors_dict["exon"][1], colors_dict["exon"][2], 0.8) #set label color to light gray
         for exon_region in gene_obj.intron_exon_dict["exon"]:
-            gene_context.set_line_width(60)
+            gene_context.set_line_width(65)
             gene_context.move_to(gene_scale_factor * exon_region[0], GENE_SURFACE_HEIGHT / 2)
             gene_context.line_to(gene_scale_factor * exon_region[1], GENE_SURFACE_HEIGHT / 2)
             gene_context.stroke()
@@ -215,8 +240,8 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
         #draw motifs
         for motif_positions_list in gene_motifs_dict[gene_obj]:
             motif_seq = motif_positions_list[0]
-            gene_context.set_source_rgba(colors_dict[motif_seq][0], colors_dict[motif_seq][1], colors_dict[motif_seq][2], 0.8) #set motif color to correct color
-            gene_context.set_line_width(40)
+            gene_context.set_source_rgba(colors_dict[motif_seq][0], colors_dict[motif_seq][1], colors_dict[motif_seq][2], 0.7) #set motif color to correct color
+            gene_context.set_line_width(48)
 
             for position_tuple in motif_positions_list[1:]:
                 gene_context.move_to(gene_scale_factor * position_tuple[0], GENE_SURFACE_HEIGHT / 2)
@@ -225,7 +250,7 @@ def create_image(gene_motifs_dict: dict, motif_object_list: list, output_image_n
 
 
 
-    parent_surface.write_to_png("test_image.png")
+    parent_surface.write_to_png(output_image_name)
 
 
 
