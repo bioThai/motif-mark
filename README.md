@@ -3,14 +3,23 @@
 # About
 Motif-mark searches for and maps the positions of transcription factor binding motifs along gene sequences in input FASTA files. The Python script in this repo, `motif-mark-oop.py`, takes in at least one FASTA file (including those where each sequence is split across multiple lines rather than all being on one line) and at least one text file of motifs to be searched for, where each motif is on a new line. 
 
-For each input FASTA file, the script outputs a one-line sequence version of the FASTA file, along with a PNG image file depicting relative positions of motifs along each gene sequence in the FASTA file. Each output PNG image depicts genes going left to right from 5'->3' and also denotes intron and exon positions. Moreover, each gene in an output PNG image is preceded by a text label that includes the gene name, the chromosome on which the gene is located, and the start and stop positions of the gene along that chromosome.
+For each input FASTA file, the script outputs a one-line sequence version of the FASTA file, along with a PNG image file depicting relative positions of motifs along each gene sequence in the FASTA file. Each output PNG image depicts genes going left to right from 5'->3' and also denotes intron and exon positions. Moreover, each gene in an output PNG image is preceded by a text label that includes the gene name, the chromosome on which the gene is located (denoted by "chr"), and the start and stop positions of the gene along that chromosome (denoted by "pos:").
 
 
 # How to Use
 
-## 1. Configure Conda environment
+## 1. Configure working environment
 
-For best results, make sure you are using __Python 3.9 or higher__. Create a Conda environment called `motif_mark` and include the following packages and versions:
+For best results, make sure you are using __Python 3.9 or higher__ and are in a __Linux- or Unix-based__ environment. 
+
+Create a Conda environment called `motif_mark` that uses Python 3.9 and install the following packages in it:
+
+```
+pycairo (version 1.19.1)
+seaborn (version 0.11.2)
+```
+
+Then, make sure the following packages and versions are also included in the Conda environment:
 
 ```
 # Name                    Version                   Build  Channel
@@ -121,9 +130,21 @@ zlib                      1.2.11               h4dc903c_4
 zstd                      1.4.9                h322a384_0
 ```
 
-## 2. Format input files
 
+## 2. Run the Python script
 
-## 3. Run the Python script
+For convenience, a wrapper shell script (`motif-mark_wrapper.sh`) is included in this repo. The shell script includes information about what Conda environment to activate, as well as information about filepaths and filenames of desired input files. The input file info in this shell script can be changed according to the files you would like to input into the `motif-mark-oop.py` script. Once the desired input filepaths and filenames are specified, run the wrapper script on the command line with the following command:
 
+```
+bash motif-mark_wrapper.sh
+```
 
+Alternatively, if you would like to run the `motif-mark-oop.py` script directly without a wrapper, you can also manually specify input filepaths on the command line when executing the Python script:
+
+```
+#activate the motif_mark Conda environment
+conda activate motif_mark
+
+#execute the python script
+python motif-mark-oop.py -f $input_fasta_filepath -m $input_motif_filepath
+```
