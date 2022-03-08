@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-from sys import flags
 import cairo    #pycairo library to draw images
 import argparse
 import re       #regular expressions
@@ -353,7 +352,6 @@ def main():
         # generate pycairo image of motifs and their locations along all genes in file
         output_img_fname = fasta_filename.split(".fa")[0] + ".png"
         create_image(gene_motifs_dict, motif_obj_list, output_img_fname)
-
 
 
 if __name__ == "__main__":
